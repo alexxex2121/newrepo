@@ -241,8 +241,18 @@ let activeMenu = "students";
 
 // To add a new menu later: add one entry here with its own render function.
 const MENUS = [
-  { id: "students", label: "Students List", render: renderStudents }
+  { id: "students", label: "Students List", render: renderStudents },
+  { id: "seating",  label: "Seating Plan",  render: renderSeating }
 ];
+
+function renderSeating(el){
+  el.innerHTML = `
+    <h2 class="page-title">Seating Plan</h2>
+    <p class="page-sub">Your seating plan opens below.</p>
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe src="seating.html" style="width:100%;height:80vh;border:0;display:block"></iframe>
+    </div>`;
+}
 
 function showApp(){
   $("login").classList.add("hidden");
