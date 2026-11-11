@@ -1,0 +1,474 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f4f9;color:#1f2937}
+.hidden{display:none !important}
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e3a5f,#2b5d8f);padding:16px}
+.login-card{background:#fff;padding:32px;border-radius:12px;width:100%;max-width:380px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.login-card h1{margin:0 0 4px;font-size:22px;color:#1e3a5f}
+.login-card p.sub{margin:0 0 18px;color:#6b7280;font-size:14px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px;color:#374151}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit;background:#fff}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#2b5d8f;box-shadow:0 0 0 3px rgba(43,93,143,.15)}
+.btn{background:#2b5d8f;color:#fff;border:0;padding:10px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600}
+.btn:hover{background:#1e3a5f}
+.btn.secondary{background:#e5e7eb;color:#1f2937}
+.btn.secondary:hover{background:#d1d5db}
+.btn.danger{background:#dc2626}
+.btn.danger:hover{background:#b91c1c}
+.btn.small{padding:7px 12px;font-size:13px}
+.btn.block{width:100%;margin-top:18px}
+.error{color:#dc2626;font-size:13px;min-height:18px;margin-top:10px}
+.link{background:none;border:0;color:#6b7280;font-size:12px;cursor:pointer;text-decoration:underline;margin-top:12px;padding:0}
+.app{display:flex;min-height:100vh}
+.sidebar{width:230px;background:#1e3a5f;color:#fff;display:flex;flex-direction:column;padding:20px 14px;flex-shrink:0}
+.brand{font-size:18px;font-weight:700;padding:6px 10px 18px;border-bottom:1px solid rgba(255,255,255,.15);margin-bottom:14px}
+.menu-btn{display:block;width:100%;text-align:left;background:none;border:0;color:#cbd5e1;padding:11px 12px;border-radius:8px;font-size:15px;cursor:pointer;margin-bottom:4px}
+.menu-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.menu-btn.active{background:#2b5d8f;color:#fff}
+.sidebar .user{margin-top:auto;font-size:13px;color:#cbd5e1;padding:10px}
+.sync{margin-top:10px;font-size:12px;color:#a7f3d0;min-height:16px}
+.sync.bad{color:#fecaca}
+.main{flex:1;padding:28px;overflow-x:auto;min-width:0}
+.page-title{margin:0 0 4px;font-size:24px;color:#1e3a5f}
+.page-sub{margin:0 0 20px;color:#6b7280;font-size:14px}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:20px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.toolbar .field{min-width:160px}
+.toolbar label{margin:0 0 6px}
+.toolbar select{min-width:150px}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.count{font-size:14px;color:#374151;font-weight:600;padding-bottom:10px}
+.add-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px}
+.add-row input{width:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#f8fafc;text-align:left;padding:10px;border-bottom:2px solid #e5e7eb;color:#374151}
+td{padding:6px 10px;border-bottom:1px solid #eef0f3}
+td input{padding:7px 9px;font-size:14px}
+.empty{text-align:center;color:#9ca3af;padding:30px}
+@media(max-width:800px){.app{flex-direction:column}.sidebar{width:auto}.row-actions{margin-left:0}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login" class="login-screen hidden">
+  <form id="loginForm" class="login-card" autocomplete="on">
+    <h1 id="loginTitle">Sign in</h1>
+    <p class="sub">School Dashboard</p>
+    <label for="username">Username</label>
+    <input id="username" autocomplete="username" required>
+    <label for="pin">PIN (4 to 6 digits)</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" required>
+    <div id="confirmWrap" class="hidden">
+      <label for="pin2">Confirm PIN</label>
+      <input id="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">
+    </div>
+    <button class="btn block" id="loginBtn" type="submit">Sign in</button>
+    <div class="error" id="loginError"></div>
+    <button type="button" class="link hidden" id="resetBtn">Forgot PIN? Reset login (student data in Google Drive is kept)</button>
+  </form>
+</div>
+
+<!-- DASHBOARD -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand">School Dashboard</div>
+    <nav id="menu"></nav>
+    <div class="user">
+      <div id="userName"></div>
+      <div class="sync" id="syncStatus"></div>
+      <button class="btn secondary small" id="logoutBtn" style="margin-top:10px">Log out</button>
+    </div>
+  </aside>
+  <main class="main" id="content"></main>
+</div>
+
+<script>
+/* ==========================================================
+   SETTINGS - paste the two values from your Google Sheet here
+   ========================================================== */
+const SCRIPT_URL  = "https://script.google.com/macros/s/AKfycbzhmAeuUHND5o96l4BE37EOIlTGkiwAvs_Z3wswVK-ofJmTkR0OJ2CgMfy0Dw6EbM7LCQ/exec";   // line 1: the Web app URL you copied
+const SECRET_KEY  = "mySchool2026key";        // line 2: the same secret word as in Code.gs
+/* ========================================================== */
+
+const CLASSES = ["4A","4B","5A","5B","6A","6B","6C","7A","7B","7C","8A","8B","8C","9A","9B","9C"];
+
+/* ========== HELPERS ========== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function load(key, fallback){
+  try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; }
+  catch(e){ return fallback; }
+}
+async function hashText(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+}
+function setStatus(text, bad){
+  const el = $("syncStatus");
+  if(!el) return;
+  el.textContent = text;
+  el.className = "sync" + (bad ? " bad" : "");
+}
+function driveReady(){
+  return SCRIPT_URL && !SCRIPT_URL.startsWith("PASTE") && SECRET_KEY && !SECRET_KEY.startsWith("PASTE");
+}
+
+/* ========== DATA ========== */
+let account = load("dash_account", null);          // { user, h }
+let state   = load("dash_data", { classes: {} });  // { classes: { "6A": [{roll,name}], ... } }
+
+// Saves on this computer right away, then sends the full list to Google Drive.
+function saveData(){
+  localStorage.setItem("dash_data", JSON.stringify(state));
+  pushChain = pushChain.then(pushRemote);
+}
+let pushChain = Promise.resolve();
+
+async function pushRemote(){
+  if(!driveReady()) return setStatus("Not connected to Google Drive", true);
+  setStatus("Saving to Google Drive...");
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ key: SECRET_KEY, classes: state.classes })
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    setStatus("Saved to Google Drive");
+  }catch(err){
+    setStatus("Not saved to Drive. Check internet and try again.", true);
+  }
+}
+
+// Loads the list from Google Drive when you sign in.
+async function loadRemote(){
+  if(!driveReady()) return setStatus("Not connected to Google Drive", true);
+  setStatus("Loading from Google Drive...");
+  try{
+    const res = await fetch(SCRIPT_URL + "?key=" + encodeURIComponent(SECRET_KEY));
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    const remote = data.classes || {};
+    if(Object.keys(remote).length){
+      state = { classes: remote };
+      localStorage.setItem("dash_data", JSON.stringify(state));
+    } else if(Object.keys(state.classes || {}).length){
+      // Drive is empty but this computer has data: upload it once.
+      await pushRemote();
+      return;
+    }
+    setStatus("Synced with Google Drive");
+    renderPage();
+  }catch(err){
+    setStatus("Could not reach Google Drive. Showing data saved on this computer.", true);
+  }
+}
+
+function classList(){
+  if(!state.classes) state.classes = {};
+  if(!state.classes[currentClass]) state.classes[currentClass] = [];
+  return state.classes[currentClass];
+}
+
+/* ========== LOGIN ========== */
+function showLogin(){
+  $("login").classList.remove("hidden");
+  $("app").classList.add("hidden");
+  $("loginError").textContent = "";
+  if(!account){
+    $("loginTitle").textContent = "Create your account";
+    $("confirmWrap").classList.remove("hidden");
+    $("pin2").required = true;
+    $("loginBtn").textContent = "Create account and open";
+    $("resetBtn").classList.add("hidden");
+  } else {
+    $("loginTitle").textContent = "Sign in";
+    $("confirmWrap").classList.add("hidden");
+    $("pin2").required = false;
+    $("loginBtn").textContent = "Sign in";
+    $("resetBtn").classList.remove("hidden");
+  }
+}
+
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const user = $("username").value.trim();
+  const pin  = $("pin").value.trim();
+  const err  = msg => { $("loginError").textContent = msg; };
+  if(!user) return err("Please enter a username.");
+  if(!/^\d{4,6}$/.test(pin)) return err("PIN must be 4 to 6 digits (numbers only).");
+  const h = await hashText(user.toLowerCase() + ":" + pin);
+
+  if(!account){
+    if(pin !== $("pin2").value.trim()) return err("The two PINs do not match.");
+    account = { user, h };
+    localStorage.setItem("dash_account", JSON.stringify(account));
+  } else {
+    if(account.user.toLowerCase() !== user.toLowerCase() || account.h !== h)
+      return err("Wrong username or PIN.");
+  }
+  sessionStorage.setItem("dash_session", "1");
+  $("pin").value = ""; $("pin2").value = "";
+  showApp();
+});
+
+// Resets only the login. Student data stays in Google Drive.
+$("resetBtn").addEventListener("click", () => {
+  if(confirm("This resets the username and PIN on this computer. Your student data in Google Drive is kept. Continue?")){
+    localStorage.removeItem("dash_account");
+    sessionStorage.removeItem("dash_session");
+    location.reload();
+  }
+});
+
+$("logoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("dash_session");
+  location.reload();
+});
+
+/* ========== APP SHELL & MENUS ========== */
+let currentClass = CLASSES[0];
+let activeMenu = "students";
+
+// To add a new menu later: add one entry here with its own render function.
+const MENUS = [
+  { id: "students", label: "Students List", render: renderStudents }
+];
+
+function showApp(){
+  $("login").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("userName").textContent = "Signed in as: " + account.user;
+  renderMenu();
+  renderPage();
+  loadRemote();
+}
+function renderMenu(){
+  $("menu").innerHTML = MENUS.map(m =>
+    `<button class="menu-btn ${m.id === activeMenu ? "active" : ""}" data-id="${m.id}">${esc(m.label)}</button>`
+  ).join("");
+  $("menu").querySelectorAll("button").forEach(b => {
+    b.addEventListener("click", () => { activeMenu = b.dataset.id; renderMenu(); renderPage(); });
+  });
+}
+function renderPage(){
+  const m = MENUS.find(x => x.id === activeMenu);
+  m.render($("content"));
+}
+
+/* ========== MENU 1: STUDENTS LIST ========== */
+function renderStudents(el){
+  el.innerHTML = `
+    <h2 class="page-title">Students List</h2>
+    <p class="page-sub">Choose a class, then add, edit, print or export the list. Changes save to Google Drive automatically.</p>
+    <div class="card">
+      <div class="toolbar">
+        <div class="field">
+          <label for="classSel">Class</label>
+          <select id="classSel">
+            ${CLASSES.map(c => `<option ${c === currentClass ? "selected" : ""}>${c}</option>`).join("")}
+          </select>
+        </div>
+        <div class="row-actions">
+          <button class="btn secondary small" id="pasteToggle">Bulk paste</button>
+          <button class="btn secondary small" id="printBtn">Print</button>
+          <button class="btn secondary small" id="pdfBtn">Save as PDF</button>
+          <button class="btn secondary small" id="excelBtn">Excel</button>
+          <button class="btn secondary small" id="wordBtn">Word</button>
+          <button class="btn danger small" id="clearBtn">Clear class</button>
+        </div>
+      </div>
+
+      <div class="add-row">
+        <div><label for="newRoll">Roll No</label><input id="newRoll" style="width:110px"></div>
+        <div><label for="newName">Student Name</label><input id="newName" style="width:280px"></div>
+        <button class="btn small" id="addBtn">Add student</button>
+      </div>
+
+      <div id="pastePanel" class="hidden" style="margin-top:18px">
+        <label for="bulkText">Paste names here, one student per line.
+          To paste Roll No and Name together, copy the two columns from Excel or Word and paste; they will be split automatically.</label>
+        <textarea id="bulkText" rows="8" placeholder="Rahul Sharma&#10;Priya Verma&#10;Amit Kumar"></textarea>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn small" id="bulkAdd">Add all to this class</button>
+          <button class="btn secondary small" id="bulkCancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="count" id="count"></div>
+      <div id="tableWrap"></div>
+    </div>`;
+
+  $("classSel").addEventListener("change", e => { currentClass = e.target.value; drawTable(); });
+
+  $("addBtn").addEventListener("click", () => {
+    const name = $("newName").value.trim();
+    if(!name) return alert("Please type the student name.");
+    classList().push({ roll: $("newRoll").value.trim(), name });
+    saveData();
+    $("newRoll").value = ""; $("newName").value = "";
+    $("newName").focus();
+    drawTable();
+  });
+
+  $("pasteToggle").addEventListener("click", () => $("pastePanel").classList.toggle("hidden"));
+  $("bulkCancel").addEventListener("click", () => $("pastePanel").classList.add("hidden"));
+  $("bulkAdd").addEventListener("click", () => {
+    const items = parseBulk($("bulkText").value);
+    if(!items.length) return alert("Nothing to add. Paste the names first.");
+    classList().push(...items);
+    saveData();
+    $("bulkText").value = "";
+    $("pastePanel").classList.add("hidden");
+    drawTable();
+    alert(items.length + " students added to Class " + currentClass + ".");
+  });
+
+  $("printBtn").addEventListener("click", printList);
+  $("pdfBtn").addEventListener("click", printList);
+  $("excelBtn").addEventListener("click", exportExcel);
+  $("wordBtn").addEventListener("click", exportWord);
+  $("clearBtn").addEventListener("click", () => {
+    if(confirm("Delete ALL students in Class " + currentClass + "? This cannot be undone.")){
+      state.classes[currentClass] = [];
+      saveData();
+      drawTable();
+    }
+  });
+
+  // Edit inside the table
+  $("tableWrap").addEventListener("change", e => {
+    const i = e.target.dataset.i, f = e.target.dataset.f;
+    if(i === undefined || !f) return;
+    classList()[i][f] = e.target.value.trim();
+    saveData();
+  });
+  // Delete a row
+  $("tableWrap").addEventListener("click", e => {
+    const i = e.target.dataset.del;
+    if(i === undefined) return;
+    classList().splice(Number(i), 1);
+    saveData();
+    drawTable();
+  });
+
+  drawTable();
+}
+
+function drawTable(){
+  const list = classList();
+  $("count").textContent = "Class " + currentClass + ": " + list.length + " student" + (list.length === 1 ? "" : "s");
+  if(!list.length){
+    $("tableWrap").innerHTML = `<div class="empty">No students in Class ${currentClass} yet. Add them above or use Bulk paste.</div>`;
+    return;
+  }
+  $("tableWrap").innerHTML = `
+    <table>
+      <thead><tr>
+        <th style="width:70px">S.No</th>
+        <th style="width:150px">Roll No</th>
+        <th>Student Name</th>
+        <th style="width:100px"></th>
+      </tr></thead>
+      <tbody>
+        ${list.map((s, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><input data-i="${i}" data-f="roll" value="${esc(s.roll)}"></td>
+            <td><input data-i="${i}" data-f="name" value="${esc(s.name)}"></td>
+            <td><button class="btn danger small" data-del="${i}">Delete</button></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+// Tab-separated lines = "Roll<TAB>Name"; otherwise the whole line is the name.
+function parseBulk(text){
+  return text.split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      if(line.includes("\t")){
+        const parts = line.split("\t");
+        return { roll: parts[0].trim(), name: parts.slice(1).join(" ").trim() };
+      }
+      return { roll: "", name: line };
+    })
+    .filter(s => s.name);
+}
+
+/* ========== EXPORT / PRINT ========== */
+function exportRows(){
+  return classList().map((s, i) => ({ "S.No": i + 1, "Roll No": s.roll, "Student Name": s.name }));
+}
+
+function exportExcel(){
+  const rows = exportRows();
+  if(!rows.length) return alert("No students to export.");
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [{ wch: 8 }, { wch: 14 }, { wch: 34 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Class " + currentClass);
+  XLSX.writeFile(wb, "Students_" + currentClass + ".xlsx");
+}
+
+function tableHTML(){
+  const rows = exportRows();
+  return `
+    <h2 style="color:#1e3a5f">Students List - Class ${esc(currentClass)}</h2>
+    <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%">
+      <tr style="background:#e5e7eb"><th>S.No</th><th>Roll No</th><th>Student Name</th></tr>
+      ${rows.map(r => `<tr><td>${r["S.No"]}</td><td>${esc(r["Roll No"])}</td><td>${esc(r["Student Name"])}</td></tr>`).join("")}
+    </table>`;
+}
+
+function exportWord(){
+  if(!classList().length) return alert("No students to export.");
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"></head><body style="font-family:Arial">${tableHTML()}</body></html>`;
+  const blob = new Blob(["﻿", html], { type: "application/msword" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "Students_" + currentClass + ".doc";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Opens a print window. For PDF, choose "Save as PDF" as the destination in the print box.
+function printList(){
+  if(!classList().length) return alert("No students to print.");
+  const w = window.open("", "_blank");
+  if(!w) return alert("Please allow pop-ups for this page, then try again.");
+  w.document.write(`<html><head><title>Students List - ${esc(currentClass)}</title>
+    <style>body{font-family:Arial,sans-serif;margin:30px;color:#111}h2{color:#1e3a5f}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:7px;text-align:left}
+    th{background:#e5e7eb}</style></head><body>${tableHTML()}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+}
+
+/* ========== START ========== */
+(function init(){
+  if(sessionStorage.getItem("dash_session") === "1" && account){
+    showApp();
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
