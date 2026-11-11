@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLASS - 6 Today's Seating Plan</title>
+<style>
+  :root {
+    --ink: #17324d;
+    --muted: #5b7188;
+    --blue: #3b82f6;
+    --cyan: #06b6d4;
+    --glass: rgba(255,255,255,.66);
+    --line: rgba(255,255,255,.82);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    font-family: "Aptos", "Segoe UI", "Trebuchet MS", sans-serif;
+    background:
+      radial-gradient(circle at 12% 12%, rgba(255,255,255,.95), transparent 28%),
+      radial-gradient(circle at 88% 18%, rgba(125,211,252,.55), transparent 30%),
+      radial-gradient(circle at 75% 88%, rgba(196,181,253,.45), transparent 30%),
+      linear-gradient(135deg, #dff3ff 0%, #e9eaff 48%, #e5f7f3 100%);
+    padding: 28px 24px 36px;
+  }
+  .page { max-width: 1500px; margin: auto; }
+  header { text-align: center; margin: 4px 0 22px; }
+  .eyebrow {
+    display: inline-block; padding: 7px 17px; border-radius: 999px;
+    background: rgba(255,255,255,.62); border: 1px solid var(--line);
+    color: #39718f; font-size: 13px; font-weight: 800;
+    letter-spacing: 2.4px; text-transform: uppercase;
+    box-shadow: 0 6px 20px rgba(55,105,145,.08);
+  }
+  h1 {
+    margin: 13px 0 7px; font-size: clamp(30px, 4vw, 54px);
+    line-height: 1.08; font-weight: 850; letter-spacing: -1.5px;
+    color: #153b5b; text-shadow: 0 2px 0 rgba(255,255,255,.7);
+  }
+  .datetime { color: var(--muted); font-size: clamp(15px, 1.7vw, 20px); font-weight: 650; }
+  .toolbar {
+    display: flex; justify-content: center; align-items: center; gap: 14px;
+    flex-wrap: wrap; margin: 20px 0 25px;
+  }
+  button {
+    border: 0; border-radius: 14px; padding: 13px 23px;
+    color: white; font-size: 15px; font-weight: 800; letter-spacing: .4px;
+    background: linear-gradient(135deg, #087eae, #2563eb);
+    box-shadow: 0 9px 22px rgba(37,99,235,.25);
+    cursor: pointer; transition: transform .18s, box-shadow .18s;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(37,99,235,.32); }
+  button:active { transform: translateY(0); }
+  .status {
+    padding: 10px 16px; border-radius: 12px; color: #326078;
+    background: rgba(255,255,255,.55); border: 1px solid rgba(255,255,255,.85);
+    font-size: 13px; font-weight: 700;
+  }
+  .stage {
+    position: relative; padding: 25px clamp(12px, 2.5vw, 34px) 30px;
+    border-radius: 28px; background: rgba(255,255,255,.28);
+    border: 1px solid rgba(255,255,255,.7);
+    box-shadow: 0 20px 60px rgba(49,83,120,.12);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  }
+  .front-label {
+    width: min(380px, 80%); margin: 0 auto 24px; padding: 10px;
+    text-align: center; border-radius: 12px;
+    color: #315a76; font-weight: 850; letter-spacing: 3px; font-size: 13px;
+    background: linear-gradient(90deg, rgba(255,255,255,.25), rgba(255,255,255,.82), rgba(255,255,255,.25));
+    border: 1px solid rgba(255,255,255,.7);
+  }
+  .rows {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px; align-items: start;
+  }
+  .column {
+    display: grid; grid-template-rows: repeat(5, auto);
+    gap: 14px; min-width: 0;
+  }
+  .column-label {
+    text-align: center; color: #52758f; font-size: 12px;
+    font-weight: 900; letter-spacing: 2px; margin: 0 0 1px;
+  }
+  .bench {
+    min-width: 0; padding: 12px 10px 13px; border-radius: 18px;
+    background: var(--glass); border: 1px solid var(--line);
+    box-shadow: 0 9px 24px rgba(55,88,120,.10), inset 0 1px 0 rgba(255,255,255,.9);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .bench-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 0 2px 9px; color: #7890a4; font-size: 10px;
+    font-weight: 850; letter-spacing: 1.4px; text-transform: uppercase;
+  }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .student {
+    min-height: 75px; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; text-align: center;
+    padding: 8px 5px; border-radius: 12px;
+    background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(229,244,255,.8));
+    border: 1px solid rgba(191,219,247,.85);
+    color: #214762; overflow-wrap: anywhere;
+  }
+  .student:nth-child(2) {
+    background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(236,232,255,.82));
+    border-color: rgba(216,206,255,.9);
+  }
+  .roll { font-size: 10px; font-weight: 850; color: #7390a7; margin-bottom: 5px; }
+  .name { font-size: clamp(10px, .95vw, 14px); line-height: 1.2; font-weight: 800; }
+  .empty {
+    color: #91a4b5; background: rgba(245,249,252,.72);
+    border: 1px dashed #b8c9d8; font-size: 12px; font-weight: 700;
+  }
+  .footer {
+    text-align: center; margin: 20px 0 0; color: #668097;
+    font-size: 12px; font-weight: 650; letter-spacing: .3px;
+  }
+  @media (max-width: 950px) {
+    .rows { gap: 10px; }
+    .bench { padding: 10px 7px; }
+    .pair { gap: 5px; }
+  }
+  @media (max-width: 580px) {
+    body { padding: 18px 10px; }
+    .stage { padding: 16px 10px 20px; }
+    .rows { grid-template-columns: 1fr; }
+    .column { grid-template-columns: repeat(2, minmax(0,1fr)); grid-template-rows: auto; }
+    .column-label { grid-column: 1 / -1; }
+    .bench { padding: 9px 7px; }
+  }
+  @media print {
+    body { padding: 10mm; background: white; }
+    .toolbar { display: none; }
+    .stage { box-shadow: none; background: white; border: 1px solid #ddd; }
+    .bench { box-shadow: none; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="eyebrow">Daily Classroom Arrangement</div>
+    <h1>CLASS - 6 Today's Seating Plan</h1>
+    <div class="datetime" id="datetime">Loading date and time…</div>
+  </header>
+
+  <div class="toolbar">
+    <button id="resetBtn" type="button">↻ RESET TODAY'S PLAN</button>
+    <div class="status" id="status">Today's arrangement is saved on this device.</div>
+  </div>
+
+  <main class="stage">
+    <div class="front-label">✦ FRONT / SMARTBOARD ✦</div>
+    <div class="rows" id="seatingRows" aria-live="polite"></div>
+  </main>
+  <div class="footer">CLASS - 6 &nbsp; • &nbsp; 29 STUDENTS &nbsp; • &nbsp; 3 COLUMNS × 5 BENCHES</div>
+</div>
+
+<script>
+const students = [
+  "Aarna Yadav", "Aarush Gupta", "Aayat Parveen", "Adab Khan",
+  "Ambiya Shaikh Javed", "Anaisha Bhattacharya", "Ananya Raghuvanshi",
+  "Atharva Agarwal", "Atharva Rastogi", "Avika Soni", "Dhriti Jaiswal",
+  "Florish Agrahari", "Ishaan Agarwal", "Jay Vardhan Mehrotra",
+  "Kavya Chaurasiya", "Mahir Chaurasia", "Manav Rastogi", "Mishika Yadav",
+  "Mohammad Fuzail", "Mohammad Yusuf", "Priyal Agrawal", "Ritij Jaiswal",
+  "Ruhi Anis", "Shourya Kumar Gupta", "Twinkal Sonkar", "Yash Agrahari",
+  "Yashni Nigam", "Yashra Alam", "Yuvaan Srivastava"
+];
+
+const STORAGE_KEY = "class6_seating_plan_v1";
+const dateKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
+function shuffled(list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makePlan() {
+  const order = shuffled(students);
+  return { date: dateKey(), order };
+}
+
+function loadPlan() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved && saved.date === dateKey() && Array.isArray(saved.order) &&
+        saved.order.length === students.length) return saved;
+  } catch (e) {}
+  const fresh = makePlan();
+  savePlan(fresh);
+  return fresh;
+}
+
+function savePlan(plan) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+}
+
+let currentPlan = loadPlan();
+
+function renderPlan() {
+  const container = document.getElementById("seatingRows");
+  container.innerHTML = "";
+  // 3 columns × 5 benches × 2 seats = 30 places; the final place remains empty.
+  for (let col = 0; col < 3; col++) {
+    const columnEl = document.createElement("section");
+    columnEl.className = "column";
+    const label = document.createElement("div");
+    label.className = "column-label";
+    label.textContent = `COLUMN ${col + 1}`;
+    columnEl.appendChild(label);
+
+    for (let bench = 0; bench < 5; bench++) {
+      const benchEl = document.createElement("div");
+      benchEl.className = "bench";
+      const top = document.createElement("div");
+      top.className = "bench-top";
+      top.innerHTML = `<span>BENCH ${bench + 1}</span><span>2 SEATS</span>`;
+      const pair = document.createElement("div");
+      pair.className = "pair";
+
+      // Fill Column 1 from Bench 1 to 5, then Column 2, then Column 3.
+      for (let seat = 0; seat < 2; seat++) {
+        const index = (col * 5 + bench) * 2 + seat;
+        const card = document.createElement("div");
+        card.className = "student";
+        if (index < currentPlan.order.length) {
+          const originalRoll = students.indexOf(currentPlan.order[index]) + 1;
+          card.innerHTML = `<span class="roll">ROLL NO. ${originalRoll}</span><span class="name"></span>`;
+          card.querySelector(".name").textContent = currentPlan.order[index];
+        } else {
+          card.classList.add("empty");
+          card.textContent = "EMPTY SEAT";
+        }
+        pair.appendChild(card);
+      }
+      benchEl.append(top, pair);
+      columnEl.appendChild(benchEl);
+    }
+    container.appendChild(columnEl);
+  }
+}
+function updateClock() {
+  const now = new Date();
+  document.getElementById("datetime").textContent =
+    now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) +
+    "  •  " + now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+document.getElementById("resetBtn").addEventListener("click", () => {
+  currentPlan = makePlan();
+  savePlan(currentPlan);
+  renderPlan();
+  document.getElementById("status").textContent = "New plan generated and locked for today ✓";
+});
+updateClock();
+setInterval(updateClock, 1000);
+renderPlan();
+
+// If the page stays open past midnight, load and show the new day's plan.
+setInterval(() => {
+  if (currentPlan.date !== dateKey()) {
+    currentPlan = loadPlan();
+    renderPlan();
+    document.getElementById("status").textContent = "A fresh plan has been generated for today.";
+  }
+}, 30000);
+</script>
+</body>
+</html>
