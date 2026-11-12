@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Table</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f4f9;color:#1f2937;padding:24px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{margin:0 0 4px;color:#1e3a5f;font-size:26px}
+.sub{margin:0 0 20px;color:#6b7280;font-size:14px}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:20px}
+label{display:block;font-size:13px;font-weight:600;margin:0 0 6px;color:#374151}
+input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit}
+input:focus{outline:none;border-color:#2b5d8f;box-shadow:0 0 0 3px rgba(43,93,143,.15)}
+.btn{background:#2b5d8f;color:#fff;border:0;padding:10px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600}
+.btn:hover{background:#1e3a5f}
+.btn:disabled{background:#9ca3af;cursor:not-allowed}
+.btn.secondary{background:#e5e7eb;color:#1f2937}
+.btn.secondary:hover{background:#d1d5db}
+.btn.danger{background:#dc2626}
+.btn.danger:hover{background:#b91c1c}
+.btn.small{padding:7px 12px;font-size:13px}
+.drop{margin-top:14px;border:2px dashed #94a3b8;border-radius:12px;padding:28px;text-align:center;color:#4b5563;cursor:pointer;background:#f8fafc}
+.drop.over{border-color:#2b5d8f;background:#eaf2fb}
+.drop b{color:#1e3a5f}
+.preview{margin-top:14px;text-align:center}
+.preview img{max-width:100%;max-height:260px;border-radius:8px;border:1px solid #e5e7eb}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.status{font-size:14px;margin-top:10px;min-height:20px;color:#2b5d8f}
+.status.bad{color:#dc2626}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.tt{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tt h3{margin:0 0 10px;font-size:17px;color:#1e3a5f}
+.tt .img{background:#f8fafc;border-radius:8px;min-height:160px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:13px;overflow:hidden}
+.tt img{max-width:100%;display:block}
+.tt .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.empty{text-align:center;color:#9ca3af;padding:30px}
+.hidden{display:none !important}
+@media print{
+  body{background:#fff;padding:0}
+  .no-print{display:none !important}
+  .card{box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Time Table</h1>
+  <p class="sub">Add a time table with a name, then drag its image (JPEG or PNG) into the box.</p>
+
+  <!-- ========== SETTINGS: paste the same two values as in index.html ========== -->
+  <script>
+    const SCRIPT_URL = "PASTE_WEB_APP_URL_HERE";  // line 1: the Web app URL
+    const SECRET_KEY = "PASTE_SECRET_HERE";       // line 2: the same secret word as in Code.gs
+  </script>
+
+  <!-- ADD FORM -->
+  <div class="card no-print">
+    <label for="ttName">Time table name (for example: Class 6A Time Table)</label>
+    <input id="ttName" placeholder="Type the name">
+
+    <div class="drop" id="drop">
+      <b>Drag the JPEG or PNG file here</b><br>
+      or click here to choose a file
+      <input type="file" id="file" accept="image/jpeg,image/png" class="hidden">
+    </div>
+
+    <div class="preview hidden" id="preview"><img id="previewImg" alt="preview"></div>
+
+    <div class="row">
+      <button class="btn" id="saveBtn" disabled>Save time table</button>
+      <button class="btn secondary" id="cancelBtn">Clear</button>
+    </div>
+    <div class="status" id="formStatus"></div>
+  </div>
+
+  <!-- LIST -->
+  <div class="no-print">
+    <div class="status" id="listStatus">Loading saved time tables...</div>
+  </div>
+  <div class="grid" id="list"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const MAX_MB = 5;
+let pending = null;              // { name, mime, data (base64), dataUrl }
+const imageCache = {};          // id -> { mime, data }
+
+function configured(){
+  return SCRIPT_URL && !SCRIPT_URL.startsWith("PASTE") && SECRET_KEY && !SECRET_KEY.startsWith("PASTE");
+}
+function setStatus(id, text, bad){
+  const el = $(id);
+  el.textContent = text;
+  el.className = "status" + (bad ? " bad" : "");
+}
+
+/* ---------- Pick and preview a file ---------- */
+
+function handleFile(file){
+  if(!file) return;
+  if(!["image/jpeg", "image/png"].includes(file.type)){
+    return setStatus("formStatus", "Only JPEG or PNG files are allowed.", true);
+  }
+  if(file.size > MAX_MB * 1024 * 1024){
+    return setStatus("formStatus", "This file is larger than " + MAX_MB + " MB. Please use a smaller image.", true);
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    pending = { mime: file.type, data: dataUrl.split(",")[1], dataUrl };
+    $("previewImg").src = dataUrl;
+    $("preview").classList.remove("hidden");
+    $("saveBtn").disabled = false;
+    setStatus("formStatus", "File ready. Type the name and click Save.");
+  };
+  reader.readAsDataURL(file);
+}
+
+$("drop").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", e => handleFile(e.target.files[0]));
+$("drop").addEventListener("dragover", e => { e.preventDefault(); $("drop").classList.add("over"); });
+$("drop").addEventListener("dragleave", () => $("drop").classList.remove("over"));
+$("drop").addEventListener("drop", e => {
+  e.preventDefault();
+  $("drop").classList.remove("over");
+  handleFile(e.dataTransfer.files[0]);
+});
+
+function clearForm(){
+  pending = null;
+  $("ttName").value = "";
+  $("file").value = "";
+  $("preview").classList.add("hidden");
+  $("previewImg").src = "";
+  $("saveBtn").disabled = true;
+  setStatus("formStatus", "");
+}
+$("cancelBtn").addEventListener("click", clearForm);
+
+/* ---------- Save to Google Drive ---------- */
+
+async function saveTimetable(){
+  const name = $("ttName").value.trim();
+  if(!name) return setStatus("formStatus", "Please type the time table name.", true);
+  if(!pending) return setStatus("formStatus", "Please choose a file first.", true);
+  if(!configured()) return setStatus("formStatus", "Settings are missing. Paste the two lines at the top of this file.", true);
+
+  $("saveBtn").disabled = true;
+  setStatus("formStatus", "Saving to Google Drive...");
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ key: SECRET_KEY, action: "addTimetable", name, mime: pending.mime, data: pending.data })
+    });
+    const out = await res.json();
+    if(out.error) throw new Error(out.error);
+    clearForm();
+    setStatus("formStatus", "Saved: " + name);
+    loadList();
+  }catch(err){
+    $("saveBtn").disabled = false;
+    setStatus("formStatus", "Not saved: " + err.message, true);
+  }
+}
+$("saveBtn").addEventListener("click", saveTimetable);
+
+/* ---------- Load and show the saved list ---------- */
+
+async function getImage(id){
+  if(imageCache[id]) return imageCache[id];
+  const res = await fetch(SCRIPT_URL + "?action=image&id=" + encodeURIComponent(id) + "&key=" + encodeURIComponent(SECRET_KEY));
+  const out = await res.json();
+  if(out.error) throw new Error(out.error);
+  imageCache[id] = out;
+  return out;
+}
+
+async function loadList(){
+  if(!configured()){
+    return setStatus("listStatus", "Settings are missing. Paste the two lines at the top of this file.", true);
+  }
+  setStatus("listStatus", "Loading saved time tables...");
+  try{
+    const res = await fetch(SCRIPT_URL + "?action=timetables&key=" + encodeURIComponent(SECRET_KEY));
+    const out = await res.json();
+    if(out.error) throw new Error(out.error);
+    const items = out.timetables || [];
+    setStatus("listStatus", items.length ? items.length + " time table(s) saved." : "");
+    $("list").innerHTML = items.length ? "" : '<div class="empty">No time tables saved yet.</div>';
+    items.forEach(drawCard);
+  }catch(err){
+    setStatus("listStatus", "Could not load: " + err.message, true);
+  }
+}
+
+function drawCard(item){
+  const card = document.createElement("div");
+  card.className = "tt";
+  card.innerHTML = `
+    <h3>${esc(item.name)}</h3>
+    <div class="img" id="img-${esc(item.id)}">Loading image...</div>
+    <div class="actions no-print">
+      <button class="btn small" data-print="${esc(item.id)}">Print</button>
+      <button class="btn secondary small" data-name="${esc(item.name)}" data-open="${esc(item.id)}">Open</button>
+      <button class="btn danger small" data-del="${esc(item.id)}" data-name="${esc(item.name)}">Delete</button>
+    </div>`;
+  $("list").appendChild(card);
+
+  getImage(item.id).then(img => {
+    const box = $("img-" + item.id);
+    if(box) box.innerHTML = `<img src="data:${img.mime};base64,${img.data}" alt="${esc(item.name)}">`;
+  }).catch(() => {
+    const box = $("img-" + item.id);
+    if(box) box.textContent = "Image could not be loaded";
+  });
+}
+
+/* ---------- Print and delete ---------- */
+
+function printImage(name, img){
+  const w = window.open("", "_blank");
+  if(!w) return alert("Please allow pop-ups for this page, then try again.");
+  w.document.write(`<html><head><title>${esc(name)}</title>
+    <style>body{margin:0;text-align:center;font-family:Arial,sans-serif}
+    h2{margin:18px 0 10px;color:#1e3a5f}
+    img{max-width:100%;height:auto}
+    @page{margin:12mm}</style></head><body>
+    <h2>${esc(name)}</h2>
+    <img src="data:${img.mime};base64,${img.data}" onload="setTimeout(function(){window.print()},200)">
+    </body></html>`);
+  w.document.close();
+  w.focus();
+}
+
+async function openOrPrint(id, name){
+  try{
+    const img = await getImage(id);
+    printImage(name, img);
+  }catch(err){
+    alert("Could not open the time table: " + err.message);
+  }
+}
+
+async function deleteTimetable(id, name){
+  if(!confirm("Delete the time table \"" + name + "\"? It will be moved to the Drive trash.")) return;
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ key: SECRET_KEY, action: "deleteTimetable", id })
+    });
+    const out = await res.json();
+    if(out.error) throw new Error(out.error);
+    delete imageCache[id];
+    loadList();
+  }catch(err){
+    alert("Could not delete: " + err.message);
+  }
+}
+
+$("list").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  if(b.dataset.print) return openOrPrint(b.dataset.print, b.dataset.name || "Time Table");
+  if(b.dataset.open) return openOrPrint(b.dataset.open, b.dataset.name || "Time Table");
+  if(b.dataset.del) return deleteTimetable(b.dataset.del, b.dataset.name || "");
+});
+
+loadList();
+</script>
+</body>
+</html>
