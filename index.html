@@ -32,6 +32,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#2b5d8f;box-sh
 .menu-btn{display:block;width:100%;text-align:left;background:none;border:0;color:#cbd5e1;padding:11px 12px;border-radius:8px;font-size:15px;cursor:pointer;margin-bottom:4px}
 .menu-btn:hover{background:rgba(255,255,255,.08);color:#fff}
 .menu-btn.active{background:#2b5d8f;color:#fff}
+.menu-sep{height:1px;background:rgba(255,255,255,.15);margin:10px 4px}
 .sidebar .user{margin-top:auto;font-size:13px;color:#cbd5e1;padding:10px}
 .sync{margin-top:10px;font-size:12px;color:#a7f3d0;min-height:16px}
 .sync.bad{color:#fecaca}
@@ -122,15 +123,17 @@ function driveReady(){
 }
 
 /* ========== DATA ========== */
-let account = load("dash_account", null);          // { user, h }
-let state   = load("dash_data", { classes: {} });  // { classes: { "6A": [{roll,name}], ... } }
+let account = load("dash_account", null);                 // { user, h }
+let state   = load("dash_data", { classes: {}, menus: [] }); // classes + custom menus
+if(!state.classes) state.classes = {};
+if(!state.menus) state.menus = [];
 
-// Saves on this computer right away, then sends the full list to Google Drive.
+// Saves on this computer right away, then sends everything to Google Drive.
+let pushChain = Promise.resolve();
 function saveData(){
   localStorage.setItem("dash_data", JSON.stringify(state));
   pushChain = pushChain.then(pushRemote);
 }
-let pushChain = Promise.resolve();
 
 async function pushRemote(){
   if(!driveReady()) return setStatus("Not connected to Google Drive", true);
@@ -139,7 +142,7 @@ async function pushRemote(){
     const res = await fetch(SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ key: SECRET_KEY, classes: state.classes })
+      body: JSON.stringify({ key: SECRET_KEY, classes: state.classes, menus: state.menus })
     });
     const data = await res.json();
     if(data.error) throw new Error(data.error);
@@ -149,7 +152,7 @@ async function pushRemote(){
   }
 }
 
-// Loads the list from Google Drive when you sign in.
+// Loads students and menus from Google Drive when you sign in.
 async function loadRemote(){
   if(!driveReady()) return setStatus("Not connected to Google Drive", true);
   setStatus("Loading from Google Drive...");
@@ -157,16 +160,21 @@ async function loadRemote(){
     const res = await fetch(SCRIPT_URL + "?key=" + encodeURIComponent(SECRET_KEY));
     const data = await res.json();
     if(data.error) throw new Error(data.error);
-    const remote = data.classes || {};
-    if(Object.keys(remote).length){
-      state = { classes: remote };
+    const remoteClasses = data.classes || {};
+    const remoteMenus = data.menus || [];
+    const remoteHasData = Object.keys(remoteClasses).length || remoteMenus.length;
+    const localHasData  = Object.keys(state.classes).length || state.menus.length;
+
+    if(remoteHasData){
+      state = { classes: remoteClasses, menus: remoteMenus };
       localStorage.setItem("dash_data", JSON.stringify(state));
-    } else if(Object.keys(state.classes || {}).length){
+    } else if(localHasData){
       // Drive is empty but this computer has data: upload it once.
       await pushRemote();
       return;
     }
     setStatus("Synced with Google Drive");
+    renderMenu();
     renderPage();
   }catch(err){
     setStatus("Could not reach Google Drive. Showing data saved on this computer.", true);
@@ -174,7 +182,6 @@ async function loadRemote(){
 }
 
 function classList(){
-  if(!state.classes) state.classes = {};
   if(!state.classes[currentClass]) state.classes[currentClass] = [];
   return state.classes[currentClass];
 }
@@ -239,19 +246,19 @@ $("logoutBtn").addEventListener("click", () => {
 let currentClass = CLASSES[0];
 let activeMenu = "students";
 
-// To add a new menu later: add one entry here with its own render function.
-const MENUS = [
+// Built-in menus. Your own menus are added from "Manage Menus" and are listed after these.
+const BUILT_IN = [
   { id: "students", label: "Students List", render: renderStudents },
-  { id: "seating",  label: "Seating Plan",  render: renderSeating }
+  { id: "manage",   label: "Manage Menus",  render: renderManage }
 ];
 
-function renderSeating(el){
-  el.innerHTML = `
-    <h2 class="page-title">Seating Plan</h2>
-    <p class="page-sub">Your seating plan opens below.</p>
-    <div class="card" style="padding:0;overflow:hidden">
-      <iframe src="seating.html" style="width:100%;height:80vh;border:0;display:block"></iframe>
-    </div>`;
+function allMenus(){
+  const custom = (state.menus || []).map(m => ({
+    id: m.id,
+    label: m.label,
+    render: el => renderFrame(el, m.label, m.file)
+  }));
+  return [...BUILT_IN.slice(0, 1), ...custom, ...BUILT_IN.slice(1)];
 }
 
 function showApp(){
@@ -263,19 +270,22 @@ function showApp(){
   loadRemote();
 }
 function renderMenu(){
-  $("menu").innerHTML = MENUS.map(m =>
-    `<button class="menu-btn ${m.id === activeMenu ? "active" : ""}" data-id="${m.id}">${esc(m.label)}</button>`
-  ).join("");
+  $("menu").innerHTML = allMenus().map((m, i, arr) => {
+    const sep = (i === arr.length - 2 && arr[i + 1] && arr.length > 2) ? "" : "";
+    return `<button class="menu-btn ${m.id === activeMenu ? "active" : ""}" data-id="${esc(m.id)}">${esc(m.label)}</button>`;
+  }).join("");
   $("menu").querySelectorAll("button").forEach(b => {
     b.addEventListener("click", () => { activeMenu = b.dataset.id; renderMenu(); renderPage(); });
   });
 }
 function renderPage(){
-  const m = MENUS.find(x => x.id === activeMenu);
+  const list = allMenus();
+  const m = list.find(x => x.id === activeMenu) || list[0];
+  activeMenu = m.id;
   m.render($("content"));
 }
 
-/* ========== MENU 1: STUDENTS LIST ========== */
+/* ========== MENU: STUDENTS LIST ========== */
 function renderStudents(el){
   el.innerHTML = `
     <h2 class="page-title">Students List</h2>
@@ -416,6 +426,85 @@ function parseBulk(text){
       return { roll: "", name: line };
     })
     .filter(s => s.name);
+}
+
+/* ========== MENU: CUSTOM PAGE (any uploaded HTML file) ========== */
+function renderFrame(el, title, file){
+  el.innerHTML = `
+    <h2 class="page-title">${esc(title)}</h2>
+    <p class="page-sub">If this area is blank or shows "404", check the file name in Manage Menus.</p>
+    <div class="card" style="padding:0;overflow:hidden">
+      <iframe src="${esc(file)}" style="width:100%;height:80vh;border:0;display:block"></iframe>
+    </div>`;
+}
+
+/* ========== MENU: MANAGE MENUS ========== */
+function renderManage(el){
+  el.innerHTML = `
+    <h2 class="page-title">Manage Menus</h2>
+    <p class="page-sub">Add a new menu by giving it a name and the exact file name of the page you uploaded to GitHub.</p>
+    <div class="card">
+      <div class="add-row" style="margin-top:0">
+        <div><label for="mName">Menu name</label><input id="mName" style="width:240px" placeholder="e.g. Seating Plan"></div>
+        <div><label for="mFile">File name on GitHub</label><input id="mFile" style="width:240px" placeholder="e.g. seating.html"></div>
+        <button class="btn small" id="mAdd">Add menu</button>
+      </div>
+      <p class="page-sub" style="margin:14px 0 0">Upload the file to your GitHub repository first, with exactly this name. The name must end in .html and must not contain spaces.</p>
+    </div>
+    <div class="card">
+      <div class="count">Your added menus</div>
+      <div id="mList"></div>
+    </div>`;
+
+  drawMenuList();
+
+  $("mAdd").addEventListener("click", () => {
+    const label = $("mName").value.trim();
+    const file  = $("mFile").value.trim();
+    if(!label) return alert("Please type the menu name.");
+    if(!/^[A-Za-z0-9_.-]+\.html$/.test(file))
+      return alert("File name must end in .html and have no spaces. Example: seating.html");
+    if((state.menus || []).some(m => m.file === file))
+      return alert("A menu already uses the file " + file + ".");
+    state.menus.push({ id: "m" + Date.now(), label, file });
+    saveData();
+    activeMenu = state.menus[state.menus.length - 1].id;
+    renderMenu();
+    renderPage();
+  });
+
+  $("mList").addEventListener("click", e => {
+    const id = e.target.dataset.mdel;
+    if(!id) return;
+    const m = state.menus.find(x => x.id === id);
+    if(confirm("Remove the menu \"" + m.label + "\"? The file on GitHub is not deleted.")){
+      state.menus = state.menus.filter(x => x.id !== id);
+      saveData();
+      if(activeMenu === id) activeMenu = "manage";
+      renderMenu();
+      renderPage();
+    }
+  });
+}
+
+function drawMenuList(){
+  const list = state.menus || [];
+  if(!list.length){
+    $("mList").innerHTML = `<div class="empty">No added menus yet.</div>`;
+    return;
+  }
+  $("mList").innerHTML = `
+    <table>
+      <thead><tr><th>Menu name</th><th>File</th><th style="width:100px"></th></tr></thead>
+      <tbody>
+        ${list.map(m => `
+          <tr>
+            <td>${esc(m.label)}</td>
+            <td>${esc(m.file)}</td>
+            <td><button class="btn danger small" data-mdel="${esc(m.id)}">Remove</button></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
 }
 
 /* ========== EXPORT / PRINT ========== */
