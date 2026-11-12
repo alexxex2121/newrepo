@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLASS TEST</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:#f1f4f9;color:#1f2937;padding:24px}
+.wrap{max-width:860px;margin:0 auto}
+h1{margin:0 0 4px;color:#1e3a5f;font-size:26px;letter-spacing:.5px}
+.sub{margin:0 0 20px;color:#6b7280;font-size:14px}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:20px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px;color:#374151}
+input,select{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit;background:#fff}
+input:focus,select:focus{outline:none;border-color:#2b5d8f;box-shadow:0 0 0 3px rgba(43,93,143,.15)}
+.grid{display:grid;grid-template-columns:1fr 2fr 1fr;gap:14px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+.btn{background:#2b5d8f;color:#fff;border:0;padding:11px 18px;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600}
+.btn:hover{background:#1e3a5f}
+.btn:disabled{background:#9ca3af;cursor:not-allowed}
+.btn.secondary{background:#e5e7eb;color:#1f2937}
+.btn.secondary:hover{background:#d1d5db}
+.status{font-size:14px;margin-top:12px;min-height:20px;color:#2b5d8f}
+.status.bad{color:#dc2626}
+.hint{font-size:12px;color:#6b7280;margin-top:6px;line-height:1.5}
+.hidden{display:none !important}
+.q{padding:14px 0;border-bottom:1px solid #eef0f3}
+.q:last-child{border-bottom:0}
+.qtext{font-weight:600;margin-bottom:8px}
+.opt{display:block;padding:8px 10px;border-radius:8px;margin:4px 0;cursor:pointer;border:1px solid transparent}
+.opt:hover{background:#f8fafc}
+.opt input{width:auto;margin-right:8px}
+.opt.right{background:#dcfce7;border-color:#86efac}
+.opt.wrong{background:#fee2e2;border-color:#fca5a5}
+.result{font-size:20px;font-weight:700;color:#1e3a5f;margin:6px 0 14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.row input{width:auto;min-width:240px}
+.test-head{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:flex-start;border-bottom:2px solid #1e3a5f;padding-bottom:10px;margin-bottom:6px}
+.test-head h2{margin:0;color:#1e3a5f;font-size:22px;letter-spacing:.5px}
+.test-head .meta{font-size:14px;color:#374151}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CLASS TEST</h1>
+  <p class="sub">Choose the class, topic and number of questions. The test is made automatically.</p>
+
+  <!-- SETUP -->
+  <div class="card" id="setup">
+    <div class="grid">
+      <div>
+        <label for="cls">CLASS</label>
+        <select id="cls">
+          <option>4A</option><option>4B</option><option>5A</option><option>5B</option>
+          <option>6A</option><option>6B</option><option>6C</option>
+          <option>7A</option><option>7B</option><option>7C</option>
+          <option>8A</option><option>8B</option><option>8C</option>
+          <option>9A</option><option>9B</option><option>9C</option>
+        </select>
+      </div>
+      <div>
+        <label for="topic">TOPIC</label>
+        <input id="topic" placeholder="e.g. Computer Basics, Input and Output Devices">
+      </div>
+      <div>
+        <label for="count">No. of Questions</label>
+        <input id="count" type="number" min="1" max="50" value="10">
+      </div>
+    </div>
+
+    <label for="apiKey">Gemini API key (saved on this computer only)</label>
+    <input id="apiKey" type="password" placeholder="Paste your key here once">
+    <div class="hint">Get a free key: open <b>aistudio.google.com</b>, sign in, click <b>Get API key</b>, then <b>Create API key</b>. Paste it here. It is stored only in this browser, not in the file.</div>
+
+    <div class="row">
+      <button class="btn" id="genBtn">Generate CLASS TEST</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- TEST -->
+  <div class="card hidden" id="testArea">
+    <div class="test-head">
+      <div>
+        <h2>CLASS TEST</h2>
+        <div class="meta" id="testMeta"></div>
+      </div>
+      <div class="row" style="margin-top:0">
+        <button class="btn secondary" id="printTestBtn">Print test</button>
+        <button class="btn secondary" id="printKeyBtn">Print with answers</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin:12px 0 4px">
+      <label for="studentName" style="margin:0">Student name:</label>
+      <input id="studentName" placeholder="Type the student's name">
+    </div>
+
+    <div id="questions"></div>
+
+    <div class="row">
+      <button class="btn" id="submitBtn">Submit and see score</button>
+    </div>
+    <div class="card hidden" id="resultCard" style="margin-top:18px"></div>
+  </div>
+</div>
+
+<script>
+const MODEL = "gemini-3.8-flash";   // Google's free AI model. Change only if Google retires it.
+let test = null;                    // { cls, topic, questions: [{question, options, answer}] }
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+function setStatus(text, bad){
+  $("status").textContent = text;
+  $("status").className = "status" + (bad ? " bad" : "");
+}
+
+// Remember the key on this computer, if the browser allows it.
+try{ $("apiKey").value = localStorage.getItem("gemini_key") || ""; }catch(e){}
+
+// Questions already used, so new tests do not repeat them.
+function usedList(){
+  try{ return JSON.parse(localStorage.getItem("used_questions")) || []; }catch(e){ return []; }
+}
+function saveUsed(list){
+  try{ localStorage.setItem("used_questions", JSON.stringify(list.slice(-1500))); }catch(e){}
+}
+
+// Mixes the four options so the correct answer is not always in the same place.
+function shuffleOptions(q){
+  const order = [0,1,2,3].sort(() => Math.random() - 0.5);
+  return { question: q.question, options: order.map(i => q.options[i]), answer: order.indexOf(q.answer) };
+}
+
+async function generate(){
+  const cls   = $("cls").value;
+  const topic = $("topic").value.trim();
+  const n     = parseInt($("count").value, 10);
+  const key   = $("apiKey").value.trim();
+
+  if(!topic) return setStatus("Please type the topic.", true);
+  if(!n || n < 1 || n > 50) return setStatus("Number of questions must be between 1 and 50.", true);
+  if(!key) return setStatus("Please paste your Gemini API key (see the note above).", true);
+  try{ localStorage.setItem("gemini_key", key); }catch(e){}
+
+  $("genBtn").disabled = true;
+  setStatus("Generating " + n + " unique questions. Please wait...");
+
+  const used = usedList();
+  const avoid = used.slice(-150).join(" | ");
+  const prompt = `Create exactly ${n} multiple choice questions for school students of Class ${cls} on the topic: "${topic}".
+Rules:
+- Suitable for Class ${cls} school level. Clear, correct, and not tricky.
+- Each question has exactly 4 options and exactly one correct option.
+- Every question must be different from each other.
+- Do NOT repeat or closely resemble any of these earlier questions: ${avoid || "(none)"}
+- Return ONLY a JSON array. Each item: {"question": "...", "options": ["...", "...", "...", "..."], "answer": 0}
+  where "answer" is the index (0 to 3) of the correct option.`;
+
+  try{
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(key)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.9 }
+        })
+      }
+    );
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error?.message || "Request failed (" + res.status + ")");
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    const raw = JSON.parse(text);
+
+    // Keep only valid questions, and drop any that repeat earlier ones.
+    const seen = new Set(used.map(norm));
+    const clean = [];
+    for(const q of raw){
+      if(!q || !q.question || !Array.isArray(q.options) || q.options.length !== 4) continue;
+      if(typeof q.answer !== "number" || q.answer < 0 || q.answer > 3) continue;
+      const key2 = norm(q.question);
+      if(seen.has(key2)) continue;
+      seen.add(key2);
+      clean.push(shuffleOptions({ question: String(q.question).trim(), options: q.options.map(String), answer: q.answer }));
+    }
+    if(!clean.length) throw new Error("No usable questions were returned. Please try again.");
+
+    const questions = clean.slice(0, n);
+    saveUsed([...used, ...questions.map(q => norm(q.question))]);
+
+    test = { cls, topic, questions };
+    renderTest();
+    setStatus(questions.length < n
+      ? "Only " + questions.length + " unique questions could be made. Try again for more."
+      : "Test ready: " + questions.length + " questions.");
+  }catch(err){
+    setStatus("Could not generate the test: " + err.message, true);
+  }finally{
+    $("genBtn").disabled = false;
+  }
+}
+
+function renderTest(){
+  $("testArea").classList.remove("hidden");
+  $("testMeta").textContent = "Class " + test.cls + "  |  Topic: " + test.topic + "  |  Questions: " + test.questions.length;
+  $("studentName").value = "";
+  $("resultCard").classList.add("hidden");
+  $("submitBtn").disabled = false;
+  $("questions").innerHTML = test.questions.map((q, i) => `
+    <div class="q">
+      <div class="qtext">${i + 1}. ${esc(q.question)}</div>
+      ${q.options.map((o, j) => `
+        <label class="opt" data-q="${i}" data-o="${j}">
+          <input type="radio" name="q${i}" value="${j}"> ${"ABCD"[j]}. ${esc(o)}
+        </label>`).join("")}
+    </div>`).join("");
+  $("testArea").scrollIntoView({ behavior: "smooth" });
+}
+
+function submitTest(){
+  const answered = test.questions.map((_, i) => {
+    const r = document.querySelector(`input[name="q${i}"]:checked`);
+    return r ? Number(r.value) : -1;
+  });
+  const unanswered = answered.filter(a => a === -1).length;
+  if(unanswered && !confirm(unanswered + " question(s) are not answered. Submit anyway?")) return;
+
+  let score = 0;
+  test.questions.forEach((q, i) => {
+    const pick = answered[i];
+    if(pick === q.answer) score++;
+    document.querySelectorAll(`input[name="q${i}"]`).forEach(inp => inp.disabled = true);
+    const correctLabel = document.querySelector(`label[data-q="${i}"][data-o="${q.answer}"]`);
+    if(correctLabel) correctLabel.classList.add("right");
+    if(pick !== -1 && pick !== q.answer){
+      const wrongLabel = document.querySelector(`label[data-q="${i}"][data-o="${pick}"]`);
+      if(wrongLabel) wrongLabel.classList.add("wrong");
+    }
+  });
+
+  const total = test.questions.length;
+  const pct = Math.round((score / total) * 100);
+  const name = $("studentName").value.trim() || "Student";
+  $("resultCard").innerHTML = `
+    <div class="result">${esc(name)}: ${score} / ${total} (${pct}%)</div>
+    <div class="hint">Correct answers are shown in green. Wrong choices are shown in red.</div>`;
+  $("resultCard").classList.remove("hidden");
+  $("submitBtn").disabled = true;
+}
+
+// Opens a print page. withAnswers = true shows the correct option in bold.
+function printTest(withAnswers){
+  if(!test) return;
+  const w = window.open("", "_blank");
+  if(!w) return alert("Please allow pop-ups for this page, then try again.");
+  const body = test.questions.map((q, i) => `
+    <div class="q">
+      <div><b>${i + 1}. ${esc(q.question)}</b></div>
+      ${q.options.map((o, j) => `
+        <div class="o ${withAnswers && j === q.answer ? "ans" : ""}">${"ABCD"[j]}. ${esc(o)}${withAnswers && j === q.answer ? "  (correct)" : ""}</div>`).join("")}
+    </div>`).join("");
+  w.document.write(`<html><head><title>CLASS TEST - ${esc(test.cls)}</title>
+    <style>body{font-family:Arial,sans-serif;margin:30px;color:#111}
+    h1{text-align:center;color:#1e3a5f;margin:0 0 4px;letter-spacing:1px}
+    .meta{text-align:center;font-size:14px;margin-bottom:6px}
+    .name{margin:14px 0 18px;font-size:14px}
+    .q{margin:12px 0;page-break-inside:avoid}.o{margin:3px 0 3px 18px;font-size:14px}
+    .ans{font-weight:bold;color:#15803d}</style></head><body>
+    <h1>CLASS TEST${withAnswers ? " - ANSWER KEY" : ""}</h1>
+    <div class="meta">Class ${esc(test.cls)} &nbsp;|&nbsp; Topic: ${esc(test.topic)} &nbsp;|&nbsp; Questions: ${test.questions.length}</div>
+    ${withAnswers ? "" : '<div class="name">Name: ______________________________ &nbsp;&nbsp; Date: ______________</div>'}
+    ${body}
+    </body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+}
+
+$("genBtn").addEventListener("click", generate);
+$("submitBtn").addEventListener("click", submitTest);
+$("printTestBtn").addEventListener("click", () => printTest(false));
+$("printKeyBtn").addEventListener("click", () => printTest(true));
+</script>
+</body>
+</html>
