@@ -52,8 +52,8 @@ input:focus{outline:none;border-color:#2b5d8f;box-shadow:0 0 0 3px rgba(43,93,14
 
   <!-- ========== SETTINGS: paste the same two values as in index.html ========== -->
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzhmAeuUHND5o96l4BE37EOIlTGkiwAvs_Z3wswVK-ofJmTkR0OJ2CgMfy0Dw6EbM7LCQ/exec";  // line 1: the Web app URL
-    const SECRET_KEY = "myschool2026key";       // line 2: the same secret word as in Code.gs
+    const SCRIPT_URL = "PASTE_WEB_APP_URL_HERE";  // line 1: the Web app URL
+    const SECRET_KEY = "PASTE_SECRET_HERE";       // line 2: the same secret word as in Code.gs
   </script>
 
   <!-- ADD FORM -->
@@ -62,9 +62,9 @@ input:focus{outline:none;border-color:#2b5d8f;box-shadow:0 0 0 3px rgba(43,93,14
     <input id="ttName" placeholder="Type the name">
 
     <div class="drop" id="drop">
-      <b>Drag the JPEG or PNG file here</b><br>
+      <b>Drag the JPG, JPEG or PNG file here</b><br>
       or click here to choose a file
-      <input type="file" id="file" accept="image/jpeg,image/png" class="hidden">
+      <input type="file" id="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png" class="hidden">
     </div>
 
     <div class="preview hidden" id="preview"><img id="previewImg" alt="preview"></div>
@@ -101,10 +101,20 @@ function setStatus(id, text, bad){
 
 /* ---------- Pick and preview a file ---------- */
 
+// Works out the file type from the file itself, or from its name if the browser gives no type.
+function getMime(file){
+  if(file.type === "image/jpeg" || file.type === "image/png") return file.type;
+  const name = file.name.toLowerCase();
+  if(name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if(name.endsWith(".png")) return "image/png";
+  return "";
+}
+
 function handleFile(file){
   if(!file) return;
-  if(!["image/jpeg", "image/png"].includes(file.type)){
-    return setStatus("formStatus", "Only JPEG or PNG files are allowed.", true);
+  const mime = getMime(file);
+  if(!mime){
+    return setStatus("formStatus", "Only JPG, JPEG or PNG files are allowed.", true);
   }
   if(file.size > MAX_MB * 1024 * 1024){
     return setStatus("formStatus", "This file is larger than " + MAX_MB + " MB. Please use a smaller image.", true);
@@ -112,7 +122,7 @@ function handleFile(file){
   const reader = new FileReader();
   reader.onload = () => {
     const dataUrl = reader.result;
-    pending = { mime: file.type, data: dataUrl.split(",")[1], dataUrl };
+    pending = { mime, data: dataUrl.split(",")[1], dataUrl };
     $("previewImg").src = dataUrl;
     $("preview").classList.remove("hidden");
     $("saveBtn").disabled = false;
